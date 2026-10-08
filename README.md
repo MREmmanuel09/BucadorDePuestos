@@ -12,8 +12,9 @@ perfil (palabras clave, zonas y remoto) y te ayuda a no perder el seguimiento.
 
 - **Aplicacion de escritorio** (Tkinter): buscar ahora, verificar disponibilidad,
   eliminar ofertas, ver/restaurar la lista negra, marcar *Postulado* / *Descartado*,
-  ordenar por fecha (mas nuevos / mas viejos), seleccion en masa (`Todo` / `Ninguno`)
-  y **editar tu perfil** sin tocar archivos.
+  ordenar por fecha (mas nuevos / mas viejos), seleccion en masa (`Todo` / `Ninguno`),
+  **editar tu perfil** sin tocar archivos, ventana de **estadisticas** (estados,
+  ultimos 7 dias y fuentes) y **busqueda automatica** opcional cada N minutos.
 - **Filtro inteligente**: palabras que acepta, palabras que descarta, zonas y modo remoto.
 - **Lista negra de 15 dias**: lo que eliminas no vuelve a aparecer en ese plazo.
 - **Deteccion de ofertas cerradas**: solo con evidencia positiva (fecha vencida,
@@ -38,6 +39,18 @@ En el primer arranque se crea `buscador/config.json` a partir de
 `buscador/config.example.json`. Ese archivo es **tu copia local** y esta ignorado
 por Git (junto con `buscador/data/`, donde quedan tus ofertas, lista negra e historial).
 
+## Capturas
+
+**Aplicacion principal** — tabla con filtros, estados y en el pie los botones de
+estadisticas y busqueda automatica:
+
+![Aplicacion principal con tres ofertas de ejemplo](docs/app-principal.png)
+
+**Editar perfil** — zonas, terminos de busqueda, palabras que acepta/descarta y
+modo remoto:
+
+![Ventana Editar perfil de busqueda](docs/app-perfil.png)
+
 ## Estructura
 
 Todo el codigo esta documentado en espanol (docstring en cada funcion) y la guia
@@ -52,6 +65,9 @@ buscador/
   config.example.json# plantilla de configuracion (versionada)
   fuentes/           # conectores: computrabajo, trabajo_org, findjob24h, linkedin
   data/              # datos locales (ignorado por Git)
+docs/                # capturas de la aplicacion
+tests/               # pruebas unitarias (unittest)
+.github/workflows/   # integracion continua (CI)
 ```
 
 ## Aviso
