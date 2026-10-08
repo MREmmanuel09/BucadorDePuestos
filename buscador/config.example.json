@@ -1,0 +1,56 @@
+{
+  "palabras_clave_busqueda": [
+    "soporte ti",
+    "soporte tecnico",
+    "tecnico informatico",
+    "redes",
+    "help desk",
+    "sistemas",
+    "it support",
+    "cableado"
+  ],
+  "palabras_clave": [
+    "soporte", "support", "helpdesk", "help desk", "mesa de ayuda",
+    "redes", "network", "wifi", "wireless", "cableado",
+    "informatic", "sistemas", "infraestructura", "sysadmin",
+    "service desk", "telecom", "servidor", "m365", "office 365",
+    "active directory", "windows", "desktop", "endpoint", "data center",
+    "n1", "nivel 1"
+  ],
+  "palabras_excluidas": [
+    "redes sociales", "community manager", "marketing", "publicidad",
+    "calidad", "vendedor", "ventas", "comercial", "contabilidad",
+    "recursos humanos", "programador", "desarrollador", "abogad"
+  ],
+  "palabras_remoto": [
+    "remoto", "teletrabajo", "hibrido", "remote", "home office",
+    "desde casa", "work from home"
+  ],
+  "zonas": [
+    "alajuela",
+    "san jose",
+    "heredia",
+    "cartago"
+  ],
+  "incluir_remoto": true,
+  "dias_retencion": 15,
+  "dias_lista_negra": 15,
+  "verificar_en_busqueda": true,
+  "verificar_max_por_corrida": 30,
+  "linkedin_ubicaciones": [
+    "Costa Rica"
+  ],
+  "max_paginas_por_busqueda": 1,
+  "max_detalles_findjob24h": 25,
+  "pausa_segundos": 0.7,
+  "notificar_toast": true,
+  "abrir_reporte": false,
+  "correo": {
+    "activo": false,
+    "smtp": "smtp.gmail.com",
+    "puerto": 465,
+    "usuario": "",
+    "clave_app": "",
+    "destino": ""
+  }
+}

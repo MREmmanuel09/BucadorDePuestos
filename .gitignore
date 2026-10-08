@@ -1,0 +1,16 @@
+# --- Datos personales (nunca subir) ---
+CV_*
+postulaciones.csv
+empresas_diana.md
+tools/
+
+# --- Actividad local de la busqueda ---
+buscador/data/
+
+# --- Configuracion propia (el repo lleva config.example.json) ---
+buscador/config.json
+
+# --- Python / sistema ---
+__pycache__/
+*.pyc
+Thumbs.db
