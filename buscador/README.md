@@ -19,7 +19,7 @@ Busca ofertas que coincidan con tu perfil (Soporte TI / Redes / Sistemas) en las
 3. Descarta ofertas ya vistas (`buscador\data\vistas.json`) y las que estan en lista negra (`buscador\data\lista_negra.json`, vigencia de `dias_lista_negra`).
 4. Borra automaticamente las ofertas con mas de `dias_retencion` dias (por defecto 15; las marcadas con `estado_envio` se conservan) y las mueve a la lista negra.
 5. Agrega las nuevas a `buscador\data\ofertas.csv` (abrelo con Excel, separador `;`).
-6. **Verifica si las ofertas siguen disponibles** (`verificar.py`): si una pagina dice "ya no se aceptan solicitudes", "oferta finalizada", responde 404/410, perdio su ID o su `validthrough` vencio, la retira del CSV y la pone en lista negra. Solo con evidencia positiva: un error de red nunca borra nada.
+6. **Verifica si las ofertas siguen disponibles** (`verificar.py`): si una pagina dice "ya no se aceptan solicitudes", "oferta finalizada", responde 404/410, perdio su ID o su `validthrough` vencio, la retira del CSV y la pone en lista negra. Solo con evidencia positiva: un error de red nunca borra nada. Las descargas usan `descargar()` con reintentos ante fallos transitorios.
 7. Genera `buscador\data\reporte.html` (visor de solo lectura).
 8. Muestra una notificacion de Windows si hay ofertas nuevas.
 
@@ -42,6 +42,7 @@ editar el perfil desde la aplicacion; las claves manuales son:
 - `max_detalles_findjob24h`: cuantas ofertas de FindJob24h se verifican (mas = mas lento).
 - `notificar_toast`: notificacion de Windows.
 - `abrir_reporte`: abrir `reporte.html` automaticamente cuando hay ofertas nuevas.
+- `app_auto_minutos`: cada cuantos minutos la app busca sola (defecto 0 = apagado; se activa con la casilla *Auto* del pie).
 - `correo`: para recibir el aviso por email, activar y llenar con una clave de aplicacion de Gmail.
 
 ## Aplicacion (`buscador\app.pyw`)
@@ -55,7 +56,19 @@ editar el perfil desde la aplicacion; las claves manuales son:
   incluir remotas; se aplica en la proxima busqueda.
 - **Seleccionar Todo/Ninguno** y orden por fecha (mas nuevos / mas viejos).
 - **Filtro en vivo** por texto y por estado; doble clic abre la oferta.
+- **Estadisticas** (pie): resumen con total, estados (postuladas/descartadas/sin
+  estado), ofertas nuevas de los ultimos 7 dias y conteo por fuente.
+- **Auto cada N min** (pie): busca sola cada `app_auto_minutos` mientras la app
+  este abierta; la casilla guarda la preferencia en `config.json`.
 - `reporte.html` es un visor de solo lectura (la gestion es en la app).
+
+## Pruebas y CI
+
+- Corre `python -m unittest discover -s tests -v` desde la raiz del proyecto
+  (carpeta `tests/`): pruebas de filtros, lista negra, verificador y helpers de la
+  app. Todo usa temporales, nunca toca tus datos reales.
+- GitHub Actions (`.github/workflows/ci.yml`) ejecuta esas mismas pruebas en
+  Windows con Python 3.12 en cada push/PR; el badge del README lo refleja.
 
 ## Borrar ofertas (evitar cola infinita)
 

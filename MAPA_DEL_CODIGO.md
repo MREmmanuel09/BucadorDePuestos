@@ -38,7 +38,11 @@ Léela con el README al lado: aquí está el **cómo**, allá el **qué**.
                                         ├─ Botón "Verificar"     ──► subprocess verificar.py
                                         ├─ Botón "Eliminar"      ──► eliminar_ofertas()  (misma lógica que main)
                                         ├─ Botón "Editar perfil" ──► escribe config.json
-                                        └─ Botón "Lista negra"   ──► restaurar entradas
+                                        ├─ Botón "Lista negra"   ──► restaurar entradas
+                                        ├─ Botón "Estadísticas"  ──► calcular_estadisticas() (resumen)
+                                        └─ "Auto cada N min"     ──► raiz.after → busca sola (app_auto_minutos)
+
+ tests/ ──► python -m unittest discover -s tests      .github/workflows/ci.yml ──► CI en cada push
 ```
 
 ## Archivo por archivo
@@ -50,11 +54,14 @@ Léela con el README al lado: aquí está el **cómo**, allá el **qué**.
 | `verificar.py` | Detecta ofertas cerradas y las retira (solo con evidencia) | `obtener`, `estado_oferta`, `verificar_ofertas` |
 | `eliminar.py` | Borrado por terminal (menú o `--dias N`) | `purgar`, `menu`, `main` |
 | `notificar.py` | Toast de Windows y correo SMTP (opcional) | `toast`, `enviar_correo` |
-| `fuentes/comun.py` | Utilidades compartidas de descarga | `fetch`, `pausar`, `sin_acentos` |
+| `fuentes/comun.py` | Utilidades compartidas de descarga (con reintentos) | `descargar`, `fetch`, `pausar`, `sin_acentos` |
 | `fuentes/computrabajo.py` | Busca en cr.computrabajo.com | `buscar` |
 | `fuentes/trabajo_org.py` | Busca en trabajo.org.cr | `buscar` |
 | `fuentes/findjob24h.py` | Busca en findjob24h.com | `buscar` |
 | `fuentes/linkedin.py` | Endpoint público de invitados de LinkedIn | `buscar` |
+| `tests/` | Pruebas unitarias (unittest, sin instalar nada) | `test_main`, `test_verificar`, `test_app_helpers` |
+| `.github/workflows/ci.yml` | CI: compila y corre las pruebas en Windows con Python 3.12 | — |
+| `docs/` | Capturas de la aplicación que ves en el README | — |
 | `config.json` | Tu perfil: zonas, palabras, dias (no se sube a GitHub) | — |
 | `config.example.json` | Plantilla que se copia al primer arranque | — |
 
@@ -86,6 +93,23 @@ las 4 sin importar de cuál venga cada oferta.
   **`_correr_hilo`**: Tk solo se toca desde el hilo principal, por eso los resultados
   vuelven por la **`cola`** y se procesan con `raiz.after` en `_procesar_cola`.
 - **`accion_perfil`** — lee `config.json`, muestra 4 cajas de texto, guarda y `recargar()`.
+- **`accion_estadisticas`** — ventana con `calcular_estadisticas()`: total, reparto por
+  estado, ofertas nuevas de los últimos 7 días y conteo por fuente.
+- **Búsqueda automática** — el `Checkbutton` del pie (`alternar_auto`) agenda
+  `_auto_tick` con `raiz.after(app_auto_minutos × 60000)`; cada tic dispara
+  `accion_buscar` si no hay trabajo en curso y vuelve a agendarse. La preferencia
+  se guarda en `config.json` con `guardar_config_parcial`.
+
+## Pruebas y CI
+
+- **Dónde**: `tests/` — `test_main.py` (filtros, lista negra, purgas, reporte),
+  `test_verificar.py` (`validthrough`, ID de Computrabajo, estados, corrida) y
+  `test_app_helpers.py` (filtros de la ventana, estadísticas, config parcial).
+  Todas redirigen rutas a un temporal: **nunca tocan tus datos reales**.
+- **Cómo** (desde la raíz del proyecto): `python -m unittest discover -s tests -v`.
+  Sin dependencias: se usa `unittest` de la biblioteca estándar.
+- **CI**: `.github/workflows/ci.yml` corre lo mismo en Windows con Python 3.12 en
+  cada push/PR; el badge del README lo refleja.
 
 ## Los archivos de datos (carpeta `data/`, no se sube a GitHub)
 
@@ -100,7 +124,9 @@ las 4 sin importar de cuál venga cada oferta.
 ## Si quieres cambiar algo, mira aquí
 
 - **Otra zona o palabra** → botón *Editar perfil* (o `config.json`).
+- **Que busque sola cada X minutos** → casilla *Auto cada N min* del pie (o `app_auto_minutos` en `config.json`; 0 = apagado).
 - **Otra fuente de empleo** → nuevo archivo en `fuentes/` con `buscar(cfg)` + agregarlo a `FUENTES` en `main.py`.
 - **El texto de los filtros** → `pasa_filtros` en `main.py`.
 - **El aspecto de la ventana** → `COLORES` y `_construir` en `app.pyw`.
 - **Cuándo se retira una oferta** → `estado_oferta` en `verificar.py`.
+- **Cómo se prueba algo** → `tests/`; añade un caso nuevo y corre `python -m unittest discover -s tests -v`.
