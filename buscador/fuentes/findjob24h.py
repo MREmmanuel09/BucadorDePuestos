@@ -1,3 +1,5 @@
+"""Buscador de ofertas en cr.findjob24h.com con verificacion de detalle."""
+
 import re
 from urllib.parse import urljoin
 
@@ -29,17 +31,20 @@ FUERTES = [
 
 
 def _candidata(slug):
+    """Indica si el enlace parece ser de un puesto informatico (sin acentos)."""
     texto = sin_acentos(slug)
     return any(k in texto for k in FUERTES)
 
 
 def _titulo_desde_slug(rel):
+    """Construye el titulo de la oferta a partir del ultimo tramo de la URL."""
     parte = rel.split("/")[-1]
     parte = re.sub(r"-job\d+$", "", parte)
     return parte.replace("-", " ").title()
 
 
 def buscar(cfg):
+    """Busca ofertas de TI en FindJob24h y verifica el detalle de las primeras."""
     ofertas = []
     pausa = cfg.get("pausa_segundos", 0.7)
     limite = int(cfg.get("max_detalles_findjob24h", 25))
@@ -55,11 +60,13 @@ def buscar(cfg):
         vistos.add(rel)
         if _candidata(rel):
             candidatos.append(rel)
+    # Solo se abre el detalle de las primeras candidatas hasta el limite.
     for rel in candidatos[:limite]:
         enlace = urljoin(BASE + "/", rel.lstrip("/"))
         ubicacion = ""
         try:
             detalle = fetch(enlace)
+            # Deja el texto plano para buscar la seccion "Ubicacion".
             texto = re.sub(r"<[^>]+>", " ", detalle)
             texto = re.sub(r"\s+", " ", texto)
             m = PATRON_UBICACION.search(texto)

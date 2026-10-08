@@ -1,3 +1,9 @@
+"""Nucleo del buscador: configura, consulta las fuentes, filtra, guarda y reporta.
+
+Este modulo contiene la logica principal del sistema. La aplicacion de escritorio
+(app.pyw) y los scripts de terminal (eliminar.py, verificar.py) importan sus
+funciones; la tarea programada de Windows ejecuta main() directamente.
+"""
 import csv
 import html
 import json
@@ -14,6 +20,7 @@ from fuentes import computrabajo, findjob24h, linkedin, trabajo_org
 from fuentes.comun import sin_acentos
 from notificar import enviar_correo, toast
 
+# ---------- Rutas de los archivos de datos ----------
 DATA = os.path.join(BASE, "data")
 CONFIG_PATH = os.path.join(BASE, "config.json")
 EJEMPLO_CONFIG_PATH = os.path.join(BASE, "config.example.json")
@@ -23,6 +30,7 @@ REPORTE_PATH = os.path.join(DATA, "reporte.html")
 LOG_PATH = os.path.join(DATA, "historial.log")
 NEGRA_PATH = os.path.join(DATA, "lista_negra.json")
 
+# ---------- Valores por defecto (se usan si falta alguna clave en config.json) ----------
 FUERTES = [
     "soporte", "support", "helpdesk", "help desk", "mesa de ayuda", "redes", "network",
     "informatic", "sistemas", "infraestructura", "ciberseguridad", "sysadmin",
@@ -45,7 +53,9 @@ DEFECTO_CONFIG = {
 }
 
 
+# ---------- Configuracion ----------
 def asegurar_config():
+    """Crea config.json la primera vez (copiando config.example.json o usando DEFECTO_CONFIG)."""
     if os.path.exists(CONFIG_PATH):
         return
     if os.path.exists(EJEMPLO_CONFIG_PATH):
@@ -58,12 +68,15 @@ def asegurar_config():
 
 
 def cargar_config():
+    """Lee config.json (creandolo si no existe) y lo devuelve como diccionario."""
     asegurar_config()
     with open(CONFIG_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 
+# ---------- Lectura y escritura de datos ----------
 def cargar_vistas():
+    """Devuelve {clave_url: fecha} de las ofertas ya vistas; dict vacio si el archivo falta o falla."""
     if not os.path.exists(VISTAS_PATH):
         return {}
     try:
@@ -75,11 +88,13 @@ def cargar_vistas():
 
 
 def guardar_vistas(vistas):
+    """Guarda el diccionario de ofertas vistas en vistas.json."""
     with open(VISTAS_PATH, "w", encoding="utf-8") as f:
         json.dump({"urls": vistas}, f, ensure_ascii=False, indent=1)
 
 
 def cargar_ofertas():
+    """Lee ofertas.csv (separador ';') y devuelve la lista de filas como diccionarios."""
     if not os.path.exists(OFERTAS_PATH):
         return []
     with open(OFERTAS_PATH, encoding="utf-8-sig", newline="") as f:
@@ -87,10 +102,12 @@ def cargar_ofertas():
 
 
 def clave_url(url):
+    """Normaliza una URL para usarla como clave: sin #final, sin espacios y en minusculas."""
     return url.split("#", 1)[0].strip().lower()
 
 
 def guardar_ofertas(ofertas):
+    """Reescribe ofertas.csv completo con la lista de ofertas dada."""
     with open(OFERTAS_PATH, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.DictWriter(f, fieldnames=COLUMNAS, delimiter=";")
         w.writeheader()
@@ -98,6 +115,7 @@ def guardar_ofertas(ofertas):
 
 
 def cargar_lista_negra():
+    """Lee lista_negra.json migrando al formato {hasta, titulo, fuente} si estaba en el formato viejo."""
     if not os.path.exists(NEGRA_PATH):
         return {}
     try:
@@ -120,11 +138,13 @@ def cargar_lista_negra():
 
 
 def guardar_lista_negra(negra):
+    """Guarda TODO el diccionario de la lista negra (sobrescribe el archivo: hacer merge antes)."""
     with open(NEGRA_PATH, "w", encoding="utf-8") as f:
         json.dump({"urls": negra}, f, ensure_ascii=False, indent=1)
 
 
 def purgar_lista_negra():
+    """Elimina de la lista negra las entradas cuya fecha 'hasta' ya paso y devuelve las vivas."""
     negra = cargar_lista_negra()
     hoy = datetime.now().strftime("%Y-%m-%d")
     vivas = {k: v for k, v in negra.items() if (v.get("hasta") or "") >= hoy}
@@ -133,7 +153,9 @@ def purgar_lista_negra():
     return vivas
 
 
+# ---------- Eliminaciones y lista negra ----------
 def dias_lista_negra():
+    """Devuelve cuantos dias dura la lista negra (clave del config, defecto 15)."""
     try:
         return int(cargar_config().get("dias_lista_negra", 15))
     except Exception:
@@ -141,7 +163,10 @@ def dias_lista_negra():
 
 
 def pasar_a_lista_negra(items):
-    """items: dicts con url, titulo, fuente. Devuelve la fecha de expiracion."""
+    """Pone URLs en lista negra con titulo y fuente. items: dicts con url, titulo, fuente.
+
+    Devuelve la fecha de expiracion (YYYY-MM-DD) o None si no habia URLs.
+    """
     claves = {clave_url(i.get("url", "")) for i in items if i.get("url")}
     if not claves:
         return None
@@ -166,6 +191,10 @@ def pasar_a_lista_negra(items):
 
 
 def purgar_ofertas(dias):
+    """Borra del CSV las ofertas con mas de N dias (las marcadas con estado se conservan).
+
+    Las borradas pasan a la lista negra. Devuelve (total_antes, cuantas_borradas).
+    """
     if not dias or not os.path.exists(OFERTAS_PATH):
         return 0, 0
     ofertas = cargar_ofertas()
@@ -191,6 +220,7 @@ def purgar_ofertas(dias):
 
 
 def eliminar_ofertas(urls):
+    """Elimina del CSV las ofertas indicadas y las pasa a la lista negra. Devuelve cuantas borró."""
     claves = {clave_url(u) for u in urls if u}
     if not claves:
         return 0
@@ -209,7 +239,9 @@ def eliminar_ofertas(urls):
     return borradas
 
 
+# ---------- Reporte y registro ----------
 def refrescar_reporte(borradas=0):
+    """Regenera reporte.html con los datos actuales; los errores solo se anotan en el log."""
     try:
         cfg = cargar_config()
         todas = cargar_ofertas()
@@ -227,6 +259,12 @@ def refrescar_reporte(borradas=0):
 
 
 def pasa_filtros(oferta, zonas, cfg):
+    """Decide si una oferta cruda entra al CSV.
+
+    Reglas: nada de palabras excluidas; al menos una palabra clave tecnica
+    (o "tecnico" + area de TI); y zona aceptada, remoto permitido, o la fuente
+    Trabajo.org (que ya trae las zonas en su busqueda).
+    """
     texto = sin_acentos(f"{oferta['titulo']} {oferta['ubicacion']}")
     excluidas = [sin_acentos(x) for x in cfg.get("palabras_excluidas", EXCLUIR)]
     if any(x in texto for x in excluidas):
@@ -243,6 +281,7 @@ def pasa_filtros(oferta, zonas, cfg):
 
 
 def recolectar(cfg):
+    """Consulta las 4 fuentes y junta sus ofertas; una fuente que falle no detiene el resto."""
     todas = []
     for modulo in FUENTES:
         try:
@@ -253,6 +292,7 @@ def recolectar(cfg):
 
 
 def escribir_csv(nuevas):
+    """Agrega las ofertas nuevas al final de ofertas.csv (crea el archivo con encabezado si falta)."""
     existe = os.path.exists(OFERTAS_PATH)
     with open(OFERTAS_PATH, "a", encoding="utf-8-sig", newline="") as f:
         w = csv.DictWriter(f, fieldnames=COLUMNAS, delimiter=";")
@@ -263,6 +303,7 @@ def escribir_csv(nuevas):
 
 
 def escribir_reporte(nuevas, todas, generado, dias_retencion, borradas):
+    """Genera reporte.html de solo lectura con las ofertas de hoy y el acumulado."""
     hoy = datetime.now().strftime("%Y-%m-%d")
     try:
         dias_negra = int(cargar_config().get("dias_lista_negra", 15))
@@ -270,6 +311,7 @@ def escribir_reporte(nuevas, todas, generado, dias_retencion, borradas):
         dias_negra = 15
 
     def dias_de(fecha):
+        """Dias transcurridos desde la fecha de la oferta hasta hoy (o '-')."""
         try:
             d = (datetime.strptime(hoy, "%Y-%m-%d") - datetime.strptime(fecha, "%Y-%m-%d")).days
             return str(d)
@@ -277,6 +319,7 @@ def escribir_reporte(nuevas, todas, generado, dias_retencion, borradas):
             return "-"
 
     def filas(items):
+        """Convierte las ofertas en filas <tr> de tabla HTML con el texto escapado."""
         out = []
         for o in items:
             url = html.escape(o.get("url", ""), quote=True)
@@ -324,12 +367,20 @@ Las ofertas con mas de {int(dias_retencion)} dias se retiran solas.</p>
 
 
 def registrar(mensaje):
+    """Agrega una linea con fecha y hora a data/historial.log (crea la carpeta si falta)."""
     os.makedirs(DATA, exist_ok=True)
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {mensaje}\n")
 
 
+# ---------- Ejecucion principal ----------
 def main():
+    """Corre una busqueda completa: purga, consulta, filtra, guarda, verifica y reporta.
+
+    Orden: (1) purga por antiguedad, (2) recolectar de las 4 fuentes,
+    (3) filtrar por perfil, (4) descartar vistas/negra y guardar nuevas,
+    (5) verificar ofertas cerradas, (6) reporte, vistas, avisos y log.
+    """
     os.makedirs(DATA, exist_ok=True)
     cfg = cargar_config()
     zonas = [sin_acentos(z) for z in cfg.get("zonas", [])]

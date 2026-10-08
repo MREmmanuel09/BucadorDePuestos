@@ -1,3 +1,9 @@
+"""Avisos al usuario: notificaciones de Windows y correo SMTP.
+
+toast() muestra un aviso de escritorio vía PowerShell y enviar_correo()
+envía un correo HTML por SMTP SSL con clave de aplicación de Gmail.
+"""
+
 import base64
 import smtplib
 import ssl
@@ -6,6 +12,12 @@ from email.message import EmailMessage
 
 
 def toast(titulo, mensaje):
+    """Muestra una notificación de Windows (aviso de escritorio).
+
+    Recibe título y mensaje; lanza PowerShell en segundo plano sin bloquear
+    y no devuelve nada.
+    """
+    # escapa comillas simples para que no rompan el literal de PowerShell
     limpio_t = titulo.replace("'", "''")
     limpio_m = mensaje.replace("'", "''")
     script = (
@@ -17,6 +29,7 @@ def toast(titulo, mensaje):
         "Start-Sleep -Seconds 14; "
         "$n.Dispose()"
     )
+    # -EncodedCommand exige UTF-16LE en base64; Popen en segundo plano
     codificado = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     subprocess.Popen(
         ["powershell", "-NoProfile", "-EncodedCommand", codificado],
@@ -25,6 +38,11 @@ def toast(titulo, mensaje):
 
 
 def enviar_correo(correo_cfg, asunto, cuerpo_html):
+    """Envía un correo HTML por SMTP SSL (Gmail con clave de aplicación).
+
+    Recibe la configuración de correo, el asunto y el cuerpo HTML; devuelve
+    True si se envió o False si no está configurado, sin lanzar errores.
+    """
     if not correo_cfg.get("activo"):
         return False
     usuario = correo_cfg.get("usuario", "")

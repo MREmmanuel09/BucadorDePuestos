@@ -1,3 +1,9 @@
+"""Mis Ofertas TI - Buscador de Puestos: app de escritorio Tkinter.
+
+Gestiona ofertas de trabajo de TI en una tabla filtrable. Botones principales:
+Buscar ahora, Verificar disponibilidad, Eliminar seleccionadas, Lista negra,
+Marcar estados y Editar perfil.
+"""
 import json
 import os
 import queue
@@ -28,6 +34,7 @@ from main import (
     registrar,
 )
 
+# ---------- Paleta de colores ----------
 COLORES = {
     "fondo": "#F4F6F9",
     "encabezado": "#1A5276",
@@ -41,7 +48,9 @@ COLORES = {
 }
 
 
+# ---------- Funciones helper de modulo ----------
 def filtrar(ofertas, texto="", estado="Todos"):
+    """Devuelve las ofertas que cumplen el texto (sin acentos) y el estado pedidos."""
     t = sin_acentos(texto.strip()) if texto else ""
     salida = []
     for o in ofertas:
@@ -61,6 +70,7 @@ def filtrar(ofertas, texto="", estado="Todos"):
 
 
 def aplicar_estado(urls, estado):
+    """Asigna 'estado' a las ofertas de las URLs dadas, guarda y devuelve cuantas toco."""
     claves = {clave_url(u) for u in urls}
     ofertas = cargar_ofertas()
     n = 0
@@ -76,6 +86,7 @@ def aplicar_estado(urls, estado):
 
 
 def restaurar_negra(urls):
+    """Quita las URLs dadas de la lista negra, guarda y devuelve cuantas se restauraron."""
     claves = {clave_url(u) for u in urls}
     negra = cargar_lista_negra()
     n = 0
@@ -90,6 +101,7 @@ def restaurar_negra(urls):
 
 
 def python_consola():
+    """Devuelve la ruta de python.exe (evita pythonw.exe) para lanzar subprocess con consola."""
     exe = sys.executable or ""
     if exe.lower().endswith("pythonw.exe"):
         candidato = os.path.join(os.path.dirname(exe), "python.exe")
@@ -99,6 +111,7 @@ def python_consola():
 
 
 def dias_de(fecha, hoy):
+    """Dias transcurridos entre 'fecha' y 'hoy' (YYYY-MM-DD); None si no se pueden leer."""
     from datetime import datetime
 
     try:
@@ -109,6 +122,7 @@ def dias_de(fecha, hoy):
 
 class Aplicacion:
     def __init__(self, raiz):
+        """Monta la ventana: estilos, interfaz, cola de hilos y carga inicial con recargar()."""
         self.raiz = raiz
         self.cola = queue.Queue()
         self.trabajando = False
@@ -119,6 +133,7 @@ class Aplicacion:
         self.recargar()
 
     def _estilos(self):
+        """Configura el tema 'clam' y los estilos ttk (botones, tabla, entradas, barra)."""
         s = ttk.Style()
         s.theme_use("clam")
         s.configure(".", font=("Segoe UI", 10), background=COLORES["fondo"], foreground=COLORES["texto"])
@@ -150,7 +165,9 @@ class Aplicacion:
         s.configure("TCombobox", padding=(8, 6))
         s.configure("Horizontal.TProgressbar", background=COLORES["acento"], troughcolor="#DCE4EC")
 
+    # ---------- Construccion de la ventana ----------
     def _construir(self):
+        """Crea encabezado con badges, toolbar, fila de filtros, tabla Treeview y pie."""
         r = self.raiz
         r.title("Mis Ofertas TI - Buscador de Puestos")
         r.geometry("1080x640")
@@ -253,6 +270,7 @@ class Aplicacion:
         self.lbl_cuentas.pack(side="right")
 
     def _set_habilitado(self, activo, *botones):
+        """Habilita o deshabilita los botones ttk recibidos segun el flag 'activo'."""
         for b in botones:
             if activo:
                 b.state(["!disabled"])
@@ -260,10 +278,12 @@ class Aplicacion:
                 b.state(["disabled"])
 
     def mensaje(self, texto, color=None):
+        """Escribe un aviso (y color opcional) en la barra de estado del pie."""
         self.lbl_mensaje.config(text=texto, fg=color or COLORES["texto"])
         self.raiz.update_idletasks()
 
     def recargar(self):
+        """Relee ofertas y lista negra, actualiza badges/cuentas y repinta la tabla."""
         self.ofertas = cargar_ofertas()
         self.negra = purgar_lista_negra()
         hoy = datetime_hoy()
@@ -276,6 +296,7 @@ class Aplicacion:
         self.pintar()
 
     def pintar(self):
+        """Vuelca la lista filtrada y ordenada a la tabla, con etiquetas de color."""
         self.tabla.delete(*self.tabla.get_children())
         hoy = datetime_hoy()
         visibles = filtrar(self.ofertas, self.var_texto.get(), self.var_filtro_estado.get())
@@ -306,15 +327,18 @@ class Aplicacion:
         self.lbl_cuentas.config(text=f"{len(self.ofertas)} ofertas")
 
     def urls_seleccionadas(self):
+        """Devuelve las URLs (ids de fila) seleccionadas en la tabla."""
         return list(self.tabla.selection())
 
     def al_seleccionar(self, _=None):
+        """Habilita botones segun la seleccion y refresca el contador de elegidas."""
         n = len(self.urls_seleccionadas())
         self._set_habilitado(n > 0, self.btn_eliminar, self.btn_marcar)
         base = f"{len(self.ofertas)} ofertas"
         self.lbl_cuentas.config(text=f"{base}   \u2022   {n} seleccionadas" if n else base)
 
     def seleccionar_todo(self, _=None):
+        """Marca todas las filas visibles (boton Todo y atajo Ctrl+A)."""
         hijos = self.tabla.get_children()
         if hijos:
             self.tabla.selection_set(hijos)
@@ -323,10 +347,12 @@ class Aplicacion:
         self.al_seleccionar()
 
     def limpiar_seleccion(self, _=None):
+        """Quita toda la seleccion de la tabla y actualiza contadores/botones."""
         self.tabla.selection_remove(self.tabla.selection())
         self.al_seleccionar()
 
     def abrir_oferta(self, _=None):
+        """Abre en el navegador la URL de la fila elegida al hacer doble clic."""
         sel = self.urls_seleccionadas()
         if sel:
             try:
@@ -335,6 +361,7 @@ class Aplicacion:
                 messagebox.showerror("Error", f"No se pudo abrir la oferta: {e}")
 
     def _ocupado(self, activo):
+        """Marca ocupada la app: bloquea botones y muestra/oculta la barra de progreso."""
         self.trabajando = activo
         estado = ["disabled"] if activo else ["!disabled"]
         for b in (self.btn_buscar, self.btn_verificar, self.btn_negra, self.btn_perfil):
@@ -347,7 +374,9 @@ class Aplicacion:
             self.progreso.stop()
             self.progreso.pack_forget()
 
+    # ---------- Acciones de la toolbar ----------
     def accion_eliminar(self):
+        """Borra las ofertas seleccionadas con confirmacion (van a lista negra 15 dias)."""
         sel = self.urls_seleccionadas()
         if not sel:
             return
@@ -367,6 +396,7 @@ class Aplicacion:
             self.mensaje("Error al eliminar.", COLORES["peligro"])
 
     def accion_marcar(self):
+        """Aplica a la seleccion el estado del combo (Postulado, Descartado o vacio)."""
         sel = self.urls_seleccionadas()
         if not sel:
             return
@@ -379,7 +409,9 @@ class Aplicacion:
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo marcar: {e}")
 
+    # ---------- Ventanas secundarias ----------
     def accion_negra(self):
+        """Abre la ventana de lista negra, con sus ofertas y el boton para restaurarlas."""
         top = tk.Toplevel(self.raiz)
         top.title("Lista negra (15 dias)")
         top.geometry("760x420")
@@ -408,6 +440,7 @@ class Aplicacion:
         hoy = datetime_hoy()
 
         def pintar_negra():
+            """Repuebla la tabla negra: titulo, fuente, fecha limite y dias restantes."""
             t.delete(*t.get_children())
             negra = cargar_lista_negra()
             for url, info in negra.items():
@@ -425,6 +458,7 @@ class Aplicacion:
         pintar_negra()
 
         def restaurar():
+            """Devuelve a la busqueda las filas elegidas de la lista negra, con confirmacion."""
             sel = list(t.selection())
             if not sel:
                 return
@@ -442,6 +476,7 @@ class Aplicacion:
         ttk.Button(barra, text="Cerrar", command=top.destroy).pack(side="right")
 
     def accion_perfil(self):
+        """Abre el editor de perfil de busqueda y guarda los cambios en config.json."""
         cfg = cargar_config()
         top = tk.Toplevel(self.raiz)
         top.title("Editar perfil de busqueda")
@@ -473,6 +508,7 @@ class Aplicacion:
                         variable=var_remoto).pack(anchor="w", pady=(10, 0))
 
         def guardar():
+            """Valida, escribe config.json con lo editado y cierra la ventana."""
             datos = cargar_config()
             for clave, caja in cajas.items():
                 datos[clave] = [l.strip() for l in caja.get("1.0", "end").splitlines() if l.strip()]
@@ -500,12 +536,15 @@ class Aplicacion:
         ttk.Button(barra, text="Guardar", style="Verde.TButton", command=guardar).pack(side="left")
         ttk.Button(barra, text="Cancelar", command=top.destroy).pack(side="left", padx=(8, 0))
 
+    # ---------- Cola de hilos (trabajo en segundo plano) ----------
     def _correr_hilo(self, funcion, al_terminar=None):
+        """Ejecuta 'funcion' en un hilo daemon y encola el resultado para la UI."""
         if self.trabajando:
             return
         self._ocupado(True)
 
         def trabajador():
+            """Corre la funcion y encola ('fin', resultado, error, callback) al terminar."""
             resultado = None
             error = None
             try:
@@ -515,9 +554,11 @@ class Aplicacion:
             self.cola.put(("fin", resultado, error, al_terminar))
 
         threading.Thread(target=trabajador, daemon=True).start()
+        # Tk solo admite llamadas desde su hilo principal: el hilo encola y after() lo drena.
         self.raiz.after(120, self._procesar_cola)
 
     def _procesar_cola(self):
+        """Drena los eventos 'linea'/'fin' en el hilo principal y se reprograma si sigue el trabajo."""
         try:
             while True:
                 evento = self.cola.get_nowait()
@@ -536,12 +577,15 @@ class Aplicacion:
         if self.trabajando:
             self.raiz.after(150, self._procesar_cola)
 
+    # ---------- Buscar y verificar en subprocess ----------
     def accion_buscar(self):
+        """Lanza main.py en un subprocess, muestra su salida y refresca al terminar."""
         if self.trabajando:
             return
         self._ocupado(True)
 
         def trabajador():
+            """Ejecuta main.py, encola cada linea de salida y luego el evento 'fin'."""
             error = None
             codigo = None
             try:
@@ -565,6 +609,7 @@ class Aplicacion:
         self.raiz.after(120, self._procesar_cola)
 
     def _fin_buscar(self, codigo):
+        """Recarga tras la busqueda y avisa si termino con errores (codigo distinto de 0)."""
         self.recargar()
         if codigo == 0:
             self.mensaje("Busqueda finalizada. Tabla actualizada.", COLORES["verde"])
@@ -572,13 +617,16 @@ class Aplicacion:
             self.mensaje("La busqueda termino con errores (revisa la consola).", COLORES["peligro"])
 
     def accion_verificar(self):
+        """Comprueba disponibilidad en un hilo y retira las ofertas que ya no existen."""
         def verificar_directo():
+            """Corre verificar_ofertas con la config actual y devuelve (retiradas, revisadas)."""
             from verificar import verificar_ofertas
 
             retiradas, revisadas = verificar_ofertas(cargar_config())
             return retiradas, revisadas
 
         def al_terminar(resultado):
+            """Recarga y avisa cuantas ofertas se retiraron o que todas siguen activas."""
             retiradas, revisadas = resultado
             self.recargar()
             if retiradas:
@@ -597,12 +645,14 @@ class Aplicacion:
 
 
 def datetime_hoy():
+    """Devuelve la fecha de hoy en formato YYYY-MM-DD."""
     from datetime import datetime
 
     return datetime.now().strftime("%Y-%m-%d")
 
 
 def ejecutar():
+    """Crea la ventana raiz, monta la Aplicacion y arranca el bucle mainloop de Tk."""
     raiz = tk.Tk()
     Aplicacion(raiz)
     raiz.mainloop()

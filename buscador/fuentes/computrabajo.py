@@ -1,3 +1,5 @@
+"""Buscador de ofertas en cr.computrabajo.com por palabras clave y paginas."""
+
 import re
 import urllib.parse
 
@@ -9,9 +11,12 @@ HASH = re.compile(r"-[0-9A-F]{32}$")
 
 
 def _partir_slug(slug):
+    """Separa el enlace de una oferta en (titulo, ubicacion) a partir de su slug."""
     texto = slug.replace("/ofertas-de-trabajo/oferta-de-trabajo-de-", "")
+    # Quita el hash hexadecimal final de la URL para quedarse solo con el texto.
     texto = HASH.sub("", texto)
     if "-en-" in texto:
+        # El titulo y la ubicacion se separan por el ultimo "-en-" del slug.
         titulo, ubicacion = texto.rsplit("-en-", 1)
     else:
         titulo, ubicacion = texto, ""
@@ -19,6 +24,7 @@ def _partir_slug(slug):
 
 
 def buscar(cfg):
+    """Recorre Computrabajo con las palabras clave de la config y devuelve ofertas."""
     ofertas = []
     vistas = set()
     pausa = cfg.get("pausa_segundos", 0.7)
@@ -37,6 +43,7 @@ def buscar(cfg):
             if not encontrados:
                 break
             for rel in dict.fromkeys(encontrados):
+                # Las URLs ya vistas se omiten: solo se conservan ofertas nuevas.
                 if rel in vistas:
                     continue
                 vistas.add(rel)

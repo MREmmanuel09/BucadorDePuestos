@@ -1,3 +1,9 @@
+"""Borrado manual de ofertas desde la terminal.
+
+Ofrece un menú interactivo o purga directa por antigüedad con --dias;
+las ofertas borradas se mueven a la lista negra del buscador.
+"""
+
 import argparse
 import os
 import sys
@@ -21,6 +27,11 @@ RETENCION_DEFECTO = 15
 
 
 def listar(ofertas):
+    """Muestra una tabla numerada de las ofertas recibidas.
+
+    Recibe la lista a imprimir; no devuelve nada. El * marca ofertas con
+    estado_envio, que no se purgan por antigüedad.
+    """
     print(f"{'#':>3}  {'Fecha':10}  {'Fuente':13} {'Titulo':52} Ubicacion")
     for i, o in enumerate(ofertas, 1):
         marcada = (o.get("estado_envio") or "").strip()
@@ -33,6 +44,10 @@ def listar(ofertas):
 
 
 def purgar(dias):
+    """Elimina del CSV las ofertas con más de N días y las manda a lista negra.
+
+    Recibe el número de días de antigüedad; devuelve cuántas se borraron.
+    """
     if not os.path.exists(OFERTAS_PATH):
         print("ofertas.csv no existe aun.")
         return 0
@@ -43,6 +58,10 @@ def purgar(dias):
 
 
 def dias_lista():
+    """Lee de la configuración los días que dura la lista negra.
+
+    No recibe nada; devuelve el valor o 15 si falta o no es válido.
+    """
     try:
         return int(cargar_config().get("dias_lista_negra", 15))
     except Exception:
@@ -50,12 +69,18 @@ def dias_lista():
 
 
 def borrar_seleccionadas(ofertas):
+    """Pide por teclado los números del listado y borra esas ofertas.
+
+    Recibe la lista de ofertas; muestra confirmación previa y no devuelve
+    nada (se cancela con Enter o entradas fuera de rango).
+    """
     listar(ofertas)
     texto = input("\nNumeros a borrar (ej: 1,5,9) o Enter para cancelar: ").strip()
     if not texto:
         print("Cancelado.")
         return
     try:
+        # de mayor a menor para que al borrar no se desplacen los números
         indices = sorted({int(p.strip()) for p in texto.split(",") if p.strip()}, reverse=True)
     except ValueError:
         print("Entrada invalida.")
@@ -76,6 +101,10 @@ def borrar_seleccionadas(ofertas):
 
 
 def menu():
+    """Menú interactivo para purgar por antigüedad o borrar ofertas puntuales.
+
+    No recibe nada; se repite hasta que el usuario elige salir.
+    """
     retencion = RETENCION_DEFECTO
     try:
         retencion = int(cargar_config().get("dias_retencion", RETENCION_DEFECTO))

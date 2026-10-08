@@ -36,6 +36,9 @@ por Git (junto con `buscador/data/`, donde quedan tus ofertas, lista negra e his
 
 ## Estructura
 
+Todo el codigo esta documentado en espanol (docstring en cada funcion) y la guia
+completa de como funciona esta en **[MAPA_DEL_CODIGO.md](MAPA_DEL_CODIGO.md)**.
+
 ```
 buscador/
   app.pyw            # aplicacion de escritorio (interfaz principal)

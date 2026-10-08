@@ -1,3 +1,10 @@
+"""Detección de ofertas cerradas en las fuentes del buscador.
+
+Descarga cada oferta y busca evidencia positiva de cierre (marcas de
+texto, fecha de expiración o ID ausente); las cerradas se retiran del
+CSV y pasan a la lista negra.
+"""
+
 import os
 import re
 import sys
@@ -13,6 +20,7 @@ if sys.stdout is not None and hasattr(sys.stdout, "reconfigure"):
 from fuentes.comun import CTX, UA, pausar
 from main import cargar_config, cargar_ofertas, eliminar_ofertas, registrar
 
+# frases en minúsculas y sin tildes que indican que la oferta ya no existe
 MARCAS_CIERRE = [
     "ya no se acepta",
     "no se aceptan solicitudes",
@@ -33,17 +41,30 @@ MARCAS_CIERRE = [
 
 
 def obtener(url, timeout=25):
-    """Devuelve (codigo, url_final, html). Lanza HTTPError en 4xx/5xx."""
+    """Descarga la página y devuelve (codigo HTTP, url final, HTML).
+
+    Recibe la URL y un timeout opcional; los errores de red o HTTP se
+    propagan al llamador, que decide cómo tolerarlos.
+    """
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=timeout, context=CTX) as r:
         return r.status, r.geturl(), r.read().decode("utf-8", "replace")
 
 
 def _texto(html):
+    """Normaliza el HTML: quita etiquetas, colapsa espacios y baja a minúsculas.
+
+    Recibe el HTML crudo y devuelve el texto plano para buscar marcas de cierre.
+    """
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).lower()
 
 
 def _validthrough(html):
+    """Extrae la fecha de expiración (metadato validthrough) del HTML.
+
+    Recibe el HTML y devuelve la fecha como 'AAAA-MM-DD' o None si no aparece.
+    """
+    # metadato tipo "validthrough": "2026-10-01..." (solo se conserva la fecha)
     m = re.search(r'"?validthrough"?\s*[:=]\s*"([^"]+)"', html, re.I)
     if not m:
         return None
@@ -52,12 +73,21 @@ def _validthrough(html):
 
 
 def _id_computrabajo(url):
+    """Extrae el ID de la oferta de una URL de Computrabajo.
+
+    Recibe la URL y devuelve el ID hexadecimal final (16+ dígitos) o None.
+    """
+    # la URL termina en "-<id hex>", p. ej. .../empleo-oferta-01ABCDEF...
     ultimo = url.rstrip("/").rsplit("-", 1)[-1]
     return ultimo if re.fullmatch(r"[0-9A-Fa-f]{16,}", ultimo) else None
 
 
 def estado_oferta(oferta, obtener_fn=obtener):
-    """'viva' | 'cerrada' | 'desconocida'. Solo evidencia positiva borra."""
+    """Clasifica la oferta como 'viva', 'cerrada' o 'desconocida'.
+
+    Recibe la oferta y la función de descarga; solo 'cerrada' exige evidencia
+    positiva: ante errores de red o páginas dudosas devuelve 'desconocida'.
+    """
     url = oferta.get("url", "")
     fuente = oferta.get("fuente", "")
     try:
@@ -75,6 +105,7 @@ def estado_oferta(oferta, obtener_fn=obtener):
     if vt and vt < datetime.now().strftime("%Y-%m-%d"):
         return "cerrada"
     if fuente == "Computrabajo":
+        # si el ID desaparece tras la redirección o del HTML, la oferta ya no existe
         ident = _id_computrabajo(url)
         if ident and ident.lower() not in final.lower() and ident.lower() not in html.lower():
             return "cerrada"
@@ -82,7 +113,11 @@ def estado_oferta(oferta, obtener_fn=obtener):
 
 
 def verificar_ofertas(cfg=None, obtener_fn=obtener):
-    """Revisa ofertas anteriores a hoy y retira las cerradas. Devuelve (retiradas, revisadas)."""
+    """Revisa ofertas anteriores a hoy y retira las cerradas del CSV.
+
+    Recibe la configuración (o None para cargarla) y la función de descarga;
+    devuelve (retiradas, revisadas), limitando a verificar_max_por_corrida.
+    """
     if cfg is None:
         cfg = cargar_config()
     hoy = datetime.now().strftime("%Y-%m-%d")

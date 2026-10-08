@@ -1,3 +1,5 @@
+"""Buscador de ofertas en LinkedIn mediante el endpoint publico de invitados."""
+
 import html
 import re
 import urllib.parse
@@ -16,11 +18,13 @@ ENLACE = re.compile(r'href="(https://[a-z]{2}\.linkedin\.com/jobs/view/[^"?]+)')
 
 
 def _limpiar(valor):
+    """Elimina etiquetas HTML, decodifica entidades y recorta espacios."""
     texto = re.sub(r"<[^>]+>", " ", valor)
     return html.unescape(re.sub(r"\s+", " ", texto)).strip()
 
 
 def buscar(cfg):
+    """Consulta el API de invitados de LinkedIn por palabra clave y ubicacion."""
     ofertas = []
     vistas = set()
     pausa = max(cfg.get("pausa_segundos", 0.7), 1.0)
@@ -30,6 +34,7 @@ def buscar(cfg):
         kw = urllib.parse.quote(consulta)
         for loc in ubicaciones:
             for pagina in range(paginas):
+                # Cada bloque de resultados avanza 25 posiciones (start=0, 25, 50...).
                 url = PLANTILLA.format(kw=kw, loc=urllib.parse.quote(loc), start=pagina * 25)
                 try:
                     html = fetch(url)
@@ -44,6 +49,7 @@ def buscar(cfg):
                     if not m_enlace or not m_titulo:
                         continue
                     enlace = m_enlace.group(1)
+                    # La URL ya vista se descarta para no duplicar la oferta.
                     if enlace in vistas:
                         continue
                     vistas.add(enlace)

@@ -1,3 +1,5 @@
+"""Buscador de ofertas en cr.trabajo.org, recorriendo sus paginas por zona."""
+
 import re
 
 from .comun import fetch, pausar
@@ -13,11 +15,13 @@ ETIQUETAS = re.compile(r"<[^>]+>")
 
 
 def _limpiar(valor):
+    """Quita etiquetas HTML y espacios de sobra de un fragmento de texto."""
     texto = ETIQUETAS.sub(" ", valor)
     return re.sub(r"\s+", " ", texto).strip(" |")
 
 
 def buscar(cfg):
+    """Recorre las zonas de Trabajo.org y devuelve la lista de ofertas encontradas."""
     ofertas = []
     pausa = cfg.get("pausa_segundos", 0.7)
     for slug, zona in PAGINAS.items():
@@ -30,6 +34,7 @@ def buscar(cfg):
             titulo = _limpiar(crudo)
             if not titulo or len(titulo) < 4:
                 continue
+            # Evita duplicados: cada URL solo se agrega una vez.
             if any(o["url"] == enlace for o in ofertas):
                 continue
             ofertas.append(

@@ -1,3 +1,5 @@
+"""Utilidades comunes: descarga de paginas, pausas y limpieza de texto."""
+
 import ssl
 import time
 import unicodedata
@@ -13,16 +15,19 @@ CTX = ssl.create_default_context()
 
 
 def fetch(url, timeout=30):
+    """Descarga una pagina web y devuelve su HTML como texto."""
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=timeout, context=CTX) as r:
         return r.read().decode("utf-8", "replace")
 
 
 def pausar(segundos):
+    """Espera los segundos indicados; no hace nada si son 0 o negativos."""
     if segundos and segundos > 0:
         time.sleep(segundos)
 
 
 def sin_acentos(texto):
+    """Convierte el texto a minusculas y elimina tildes/diacriticos."""
     forma = unicodedata.normalize("NFKD", texto.lower())
     return "".join(c for c in forma if not unicodedata.combining(c))
