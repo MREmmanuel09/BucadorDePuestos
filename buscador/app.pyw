@@ -120,17 +120,67 @@ def dias_de(fecha, hoy):
         return None
 
 
+def calcular_estadisticas(ofertas, hoy=None):
+    """Resume las ofertas para la ventana de estadisticas.
+
+    Recibe la lista de ofertas y 'hoy' opcional (YYYY-MM-DD). Devuelve un dict
+    con 'total', 'estados' (postuladas/descartadas/sin_estado), 'por_dia':
+    lista de (fecha, conteo) de los ultimos 7 dias, y 'fuentes': lista de
+    (fuente, conteo) ordenada de mayor a menor.
+    """
+    from datetime import datetime, timedelta
+
+    if not hoy:
+        hoy = datetime.now().strftime("%Y-%m-%d")
+    estados = {"postuladas": 0, "descartadas": 0, "sin_estado": 0}
+    por_fecha = {}
+    fuentes = {}
+    for o in ofertas:
+        est = (o.get("estado_envio") or "").strip()
+        if est == "Postulado":
+            estados["postuladas"] += 1
+        elif est == "Descartado":
+            estados["descartadas"] += 1
+        else:
+            estados["sin_estado"] += 1
+        fecha = (o.get("fecha") or "").strip()
+        if fecha:
+            por_fecha[fecha] = por_fecha.get(fecha, 0) + 1
+        fuente = (o.get("fuente") or "").strip() or "Otra"
+        fuentes[fuente] = fuentes.get(fuente, 0) + 1
+    base = datetime.strptime(hoy, "%Y-%m-%d")
+    por_dia = []
+    for i in range(6, -1, -1):
+        dia = (base - timedelta(days=i)).strftime("%Y-%m-%d")
+        por_dia.append((dia, por_fecha.get(dia, 0)))
+    fuentes_ordenadas = sorted(fuentes.items(), key=lambda kv: (-kv[1], kv[0]))
+    return {"total": len(ofertas), "estados": estados, "por_dia": por_dia,
+            "fuentes": fuentes_ordenadas}
+
+
+def guardar_config_parcial(actualizacion):
+    """Fusiona las claves de 'actualizacion' en config.json y lo guarda."""
+    datos = cargar_config()
+    datos.update(actualizacion)
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False, indent=2)
+
+
 class Aplicacion:
     def __init__(self, raiz):
-        """Monta la ventana: estilos, interfaz, cola de hilos y carga inicial con recargar()."""
+        """Monta la ventana: estilos, interfaz, cola de hilos, carga inicial y auto."""
         self.raiz = raiz
         self.cola = queue.Queue()
         self.trabajando = False
         self.ofertas = []
         self.negra = {}
+        self._auto_id = None
         self._estilos()
         self._construir()
         self.recargar()
+        minutos_auto = int(cargar_config().get("app_auto_minutos", 0) or 0)
+        if minutos_auto > 0:
+            self._programar_auto(minutos_auto)
 
     def _estilos(self):
         """Configura el tema 'clam' y los estilos ttk (botones, tabla, entradas, barra)."""
@@ -163,6 +213,9 @@ class Aplicacion:
         s.map("Treeview.Heading", background=[("active", COLORES["encabezado"])])
         s.configure("TEntry", fieldbackground=COLORES["blanco"], padding=(8, 6))
         s.configure("TCombobox", padding=(8, 6))
+        s.configure("TCheckbutton", background="#DCE4EC")
+        s.map("TCheckbutton", background=[("active", "#DCE4EC")],
+              foreground=[("active", COLORES["acento_oscuro"])])
         s.configure("Horizontal.TProgressbar", background=COLORES["acento"], troughcolor="#DCE4EC")
 
     # ---------- Construccion de la ventana ----------
@@ -265,6 +318,16 @@ class Aplicacion:
                                     bg="#DCE4EC", fg=COLORES["texto"],
                                     font=("Segoe UI", 10))
         self.lbl_mensaje.pack(side="left")
+        ttk.Button(pie, text="\U0001F4CA Estadísticas", command=self.accion_estadisticas).pack(
+            side="left", padx=(18, 8))
+        minutos_auto = int(cargar_config().get("app_auto_minutos", 0) or 0)
+        self.var_auto = tk.BooleanVar(value=minutos_auto > 0)
+        ttk.Checkbutton(
+            pie,
+            text=f"Auto cada {minutos_auto if minutos_auto > 0 else 10} min",
+            variable=self.var_auto,
+            command=self.alternar_auto,
+        ).pack(side="left")
         self.lbl_cuentas = tk.Label(pie, text="", bg="#DCE4EC", fg="#5D6D7E",
                                     font=("Segoe UI", 10))
         self.lbl_cuentas.pack(side="right")
@@ -535,6 +598,80 @@ class Aplicacion:
         barra.pack(fill="x")
         ttk.Button(barra, text="Guardar", style="Verde.TButton", command=guardar).pack(side="left")
         ttk.Button(barra, text="Cancelar", command=top.destroy).pack(side="left", padx=(8, 0))
+
+    # ---------- Ventana de estadisticas ----------
+    def accion_estadisticas(self):
+        """Abre una ventana con el resumen: estados, ultimos 7 dias y fuentes."""
+        datos = calcular_estadisticas(self.ofertas)
+        top = tk.Toplevel(self.raiz)
+        top.title("Estadisticas")
+        top.geometry("400x560")
+        top.configure(bg=COLORES["fondo"])
+        marco = tk.Frame(top, bg=COLORES["fondo"], padx=16, pady=14)
+        marco.pack(fill="both", expand=True)
+
+        def encabezado(texto):
+            """Escribe un titulo de seccion dentro de la ventana."""
+            tk.Label(marco, text=texto, bg=COLORES["fondo"], anchor="w",
+                     font=("Segoe UI", 11, "bold")).pack(fill="x", pady=(12, 2))
+
+        def linea(izq, der):
+            """Escribe una fila 'concepto ... valor' dentro de la ventana."""
+            fila = tk.Frame(marco, bg=COLORES["fondo"])
+            fila.pack(fill="x")
+            tk.Label(fila, text=izq, bg=COLORES["fondo"], anchor="w").pack(side="left")
+            tk.Label(fila, text=str(der), bg=COLORES["fondo"], anchor="e",
+                     font=("Segoe UI", 10, "bold")).pack(side="right")
+
+        tk.Label(marco, text=f"Total: {datos['total']} ofertas activas",
+                 bg=COLORES["fondo"], font=("Segoe UI", 12, "bold")).pack(anchor="w")
+        encabezado("Por estado")
+        linea("Postuladas", datos["estados"]["postuladas"])
+        linea("Descartadas", datos["estados"]["descartadas"])
+        linea("Sin estado", datos["estados"]["sin_estado"])
+        encabezado("Nuevas por dia (ultimos 7)")
+        for fecha, conteo in datos["por_dia"]:
+            linea(fecha, conteo)
+        encabezado("Por fuente")
+        for fuente, conteo in datos["fuentes"]:
+            linea(fuente, conteo)
+        ttk.Button(marco, text="Cerrar", command=top.destroy).pack(pady=(16, 0))
+
+    # ---------- Busqueda automatica ----------
+    def alternar_auto(self):
+        """Activa o desactiva la busqueda periodica y guarda la preferencia."""
+        if self.var_auto.get():
+            minutos = int(cargar_config().get("app_auto_minutos", 0) or 0)
+            if minutos <= 0:
+                minutos = 10
+                guardar_config_parcial({"app_auto_minutos": minutos})
+            self._programar_auto(minutos)
+            self.mensaje(f"Busqueda automatica cada {minutos} min.")
+        else:
+            self._cancelar_auto()
+            guardar_config_parcial({"app_auto_minutos": 0})
+            self.mensaje("Busqueda automatica desactivada.")
+
+    def _programar_auto(self, minutos):
+        """Agenda _auto_tick a 'minutos' y cancela cualquier timer previo."""
+        self._cancelar_auto()
+        self._auto_id = self.raiz.after(int(minutos) * 60000, self._auto_tick)
+
+    def _cancelar_auto(self):
+        """Cancela el timer de busqueda automatica si esta pendiente."""
+        if getattr(self, "_auto_id", None) is not None:
+            self.raiz.after_cancel(self._auto_id)
+            self._auto_id = None
+
+    def _auto_tick(self):
+        """Corre una busqueda si no hay trabajo en curso y agenda la siguiente."""
+        self._auto_id = None
+        minutos = int(cargar_config().get("app_auto_minutos", 0) or 0)
+        if minutos <= 0 or not self.var_auto.get():
+            return
+        if not self.trabajando:
+            self.accion_buscar()
+        self._auto_id = self.raiz.after(minutos * 60000, self._auto_tick)
 
     # ---------- Cola de hilos (trabajo en segundo plano) ----------
     def _correr_hilo(self, funcion, al_terminar=None):

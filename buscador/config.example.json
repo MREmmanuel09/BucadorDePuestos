@@ -45,6 +45,7 @@
   "pausa_segundos": 0.7,
   "notificar_toast": true,
   "abrir_reporte": false,
+  "app_auto_minutos": 0,
   "correo": {
     "activo": false,
     "smtp": "smtp.gmail.com",

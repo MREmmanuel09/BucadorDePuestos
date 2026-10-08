@@ -74,5 +74,71 @@ class PruebaPythonConsola(unittest.TestCase):
         self.assertTrue(app.python_consola().endswith("python.exe"))
 
 
+class PruebaEstadisticas(unittest.TestCase):
+    """Pruebas de calcular_estadisticas (resumen para la ventana de estadisticas)."""
+
+    OFERTAS = [
+        {"fecha": "2999-01-01", "fuente": "LinkedIn", "estado_envio": "Postulado"},
+        {"fecha": "2999-01-01", "fuente": "LinkedIn", "estado_envio": ""},
+        {"fecha": "2999-01-02", "fuente": "Computrabajo", "estado_envio": "Descartado"},
+        {"fecha": "2000-01-01", "fuente": "Computrabajo", "estado_envio": ""},
+        {"fecha": "", "fuente": "", "estado_envio": ""},
+    ]
+
+    def test_totales_y_estados(self):
+        """Cuenta el total y reparte por estado (vacio cuenta como sin estado)."""
+        datos = app.calcular_estadisticas(self.OFERTAS, hoy="2999-01-03")
+        self.assertEqual(datos["total"], 5)
+        self.assertEqual(datos["estados"],
+                         {"postuladas": 1, "descartadas": 1, "sin_estado": 3})
+
+    def test_por_dia_siete_dias(self):
+        """Devuelve exactamente 7 dias ascendentes con los conteos de cada uno."""
+        datos = app.calcular_estadisticas(self.OFERTAS, hoy="2999-01-07")
+        self.assertEqual(len(datos["por_dia"]), 7)
+        self.assertEqual(datos["por_dia"][0][0], "2999-01-01")
+        self.assertEqual(datos["por_dia"][-1], ("2999-01-07", 0))
+        self.assertEqual(dict(datos["por_dia"])["2999-01-01"], 2)
+        self.assertEqual(dict(datos["por_dia"])["2999-01-02"], 1)
+
+    def test_fuentes_ordenadas_por_conteo(self):
+        """Las fuentes salen de mayor a menor; la vacia queda como 'Otra'."""
+        datos = app.calcular_estadisticas(self.OFERTAS, hoy="2999-01-03")
+        self.assertEqual(datos["fuentes"][0], ("Computrabajo", 2))
+        self.assertEqual(datos["fuentes"][1], ("LinkedIn", 2))
+        self.assertIn(("Otra", 1), datos["fuentes"])
+
+
+class PruebaConfigParcial(unittest.TestCase):
+    """Pruebas de guardar_config_parcial (fusion claves en config.json)."""
+
+    def setUp(self):
+        """Redirige el config (main y app) a un temporal."""
+        import tempfile
+        import main
+        self.tmp = tempfile.mkdtemp(prefix="cfg_test_")
+        self._orig = (main.CONFIG_PATH, main.EJEMPLO_CONFIG_PATH, app.CONFIG_PATH)
+        main.CONFIG_PATH = os.path.join(self.tmp, "config.json")
+        main.EJEMPLO_CONFIG_PATH = os.path.join(self.tmp, "sin_ejemplo.json")
+        app.CONFIG_PATH = main.CONFIG_PATH
+
+    def tearDown(self):
+        """Restaura el config original y borra el temporal."""
+        import shutil
+        import main
+        main.CONFIG_PATH, main.EJEMPLO_CONFIG_PATH, app.CONFIG_PATH = self._orig
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_fusiona_sin_tocar_otros(self):
+        """guardar_config_parcial agrega la clave y conserva las demas."""
+        import json
+        import main
+        app.guardar_config_parcial({"app_auto_minutos": 10})
+        with open(main.CONFIG_PATH, encoding="utf-8") as f:
+            datos = json.load(f)
+        self.assertEqual(datos["app_auto_minutos"], 10)
+        self.assertIn("palabras_clave", datos)
+
+
 if __name__ == "__main__":
     unittest.main()
