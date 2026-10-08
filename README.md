@@ -1,5 +1,9 @@
 # Buscador de Puestos — Soporte TI / Redes
 
+[![CI](https://github.com/MREmmanuel09/BucadorDePuestos/actions/workflows/ci.yml/badge.svg)](https://github.com/MREmmanuel09/BucadorDePuestos/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+
 Herramienta de escritorio en Python (solo biblioteca estandar) que busca ofertas de
 trabajo en **Computrabajo, Trabajo.org, FindJob24h y LinkedIn**, las filtra segun tu
 perfil (palabras clave, zonas y remoto) y te ayuda a no perder el seguimiento.
@@ -54,3 +58,9 @@ buscador/
 
 Uso personal: las fuentes se consultan publicamente con pausas entre solicitudes y
 pueden cambiar sin aviso. Respeta los terminos de uso de cada sitio.
+
+## Licencia
+
+Distribuido bajo la licencia **MIT** — ver [LICENSE](LICENSE). Puedes usarlo,
+modificarlo y compartirlo libremente (incluso con fines comerciales), conservando
+el aviso de copyright.
