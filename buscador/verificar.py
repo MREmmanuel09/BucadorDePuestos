@@ -9,7 +9,6 @@ import os
 import re
 import sys
 import urllib.error
-import urllib.request
 from datetime import datetime
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -17,7 +16,7 @@ sys.path.insert(0, BASE)
 if sys.stdout is not None and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from fuentes.comun import CTX, UA, pausar
+from fuentes.comun import descargar, pausar
 from main import cargar_config, cargar_ofertas, eliminar_ofertas, registrar
 
 # frases en minúsculas y sin tildes que indican que la oferta ya no existe
@@ -37,18 +36,20 @@ MARCAS_CIERRE = [
     "position has been filled",
     "job has been filled",
     "application period has ended",
+    "oferta expirada",
+    "la oferta ha expirado",
+    "vacante cerrada",
 ]
 
 
 def obtener(url, timeout=25):
     """Descarga la página y devuelve (codigo HTTP, url final, HTML).
 
-    Recibe la URL y un timeout opcional; los errores de red o HTTP se
-    propagan al llamador, que decide cómo tolerarlos.
+    Recibe la URL y un timeout opcional; reintenta ante fallos transitorios
+    (ver fuentes.comun.descargar) y propaga los errores definitivos (p. ej.
+    404), que el clasificador trata como evidencia de cierre.
     """
-    req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=timeout, context=CTX) as r:
-        return r.status, r.geturl(), r.read().decode("utf-8", "replace")
+    return descargar(url, timeout)
 
 
 def _texto(html):
@@ -63,13 +64,11 @@ def _validthrough(html):
     """Extrae la fecha de expiración (metadato validthrough) del HTML.
 
     Recibe el HTML y devuelve la fecha como 'AAAA-MM-DD' o None si no aparece.
+    Tolera los formatos de las distintas fuentes: con o sin comillas, ISO con
+    hora ('2026-11-05T23:59:59+01:00') o con espacio ('2026-10-22 05:22:19').
     """
-    # metadato tipo "validthrough": "2026-10-01..." (solo se conserva la fecha)
-    m = re.search(r'"?validthrough"?\s*[:=]\s*"([^"]+)"', html, re.I)
-    if not m:
-        return None
-    m2 = re.match(r"(\d{4}-\d{2}-\d{2})", m.group(1))
-    return m2.group(1) if m2 else None
+    m = re.search(r'"?validthrough"?\s*[:=]\s*"?(\d{4}-\d{2}-\d{2})', html, re.I)
+    return m.group(1) if m else None
 
 
 def _id_computrabajo(url):

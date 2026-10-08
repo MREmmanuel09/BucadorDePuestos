@@ -3,6 +3,7 @@
 import ssl
 import time
 import unicodedata
+import urllib.error
 import urllib.request
 
 UA = {
@@ -14,11 +15,33 @@ UA = {
 CTX = ssl.create_default_context()
 
 
+def descargar(url, timeout=30, intentos=3):
+    """Descarga una pagina y devuelve (codigo HTTP, url final, HTML).
+
+    Reintenta hasta 'intentos' veces con espera creciente (1.5s, 3s...) ante
+    timeouts, errores de red y respuestas 5xx; los 4xx se propagan de inmediato
+    para no reintentar algo que no existe (p. ej. un 404).
+    """
+    ultimo_error = None
+    for intento in range(1, intentos + 1):
+        req = urllib.request.Request(url, headers=UA)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout, context=CTX) as r:
+                return r.status, r.geturl(), r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            if 400 <= e.code < 500:
+                raise
+            ultimo_error = e
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            ultimo_error = e
+        if intento < intentos:
+            time.sleep(1.5 * intento)
+    raise ultimo_error
+
+
 def fetch(url, timeout=30):
-    """Descarga una pagina web y devuelve su HTML como texto."""
-    req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=timeout, context=CTX) as r:
-        return r.read().decode("utf-8", "replace")
+    """Descarga una pagina web y devuelve su HTML como texto (con reintentos)."""
+    return descargar(url, timeout)[2]
 
 
 def pausar(segundos):
